@@ -1,0 +1,81 @@
+HTML
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>인선식당 주방 시스템 2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 min-h-screen text-white">
+    <header class="p-5 border-b-4 border-orange-500 flex justify-between items-center bg-gray-800 shadow-xl">
+        <h1 class="text-3xl font-black">👨‍🍳 주방 실시간 주문</h1>
+        <div id="clock" class="text-xl font-mono">00:00:00</div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6" id="kitchen-container">
+        </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAnE0SJFtaNJP5w113-H9hj4zDZ54tzfrw",
+        authDomain: "insun-order.firebaseapp.com",
+        databaseURL: "https://insun-order-default-rtdb.firebaseio.com",
+        projectId: "insun-order",
+        storageBucket: "insun-order.firebasestorage.app",
+        messagingSenderId: "296909734803",
+        appId: "1:296909734803:web:3d3316c7e4e6e4812d9e66"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const ordersRef = ref(db, 'orders');
+    onValue(ordersRef, (snapshot) => {
+        const container = document.getElementById('kitchen-container');
+        container.innerHTML = '';
+        const data = snapshot.val();
+
+        if (data) {
+            Object.keys(data).reverse().forEach(id => {
+                const order = data[id];
+                const card = document.createElement('div');
+                card.className = "bg-white text-gray-800 rounded-3xl overflow-hidden shadow-2xl border-t-8 border-orange-500";
+                
+                const itemsHtml = order.items.map(item => `
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-xl font-bold">${item.name}</span>
+                        <span class="text-xl text-orange-600 font-black">${item.quantity}개</span>
+                    </div>
+                `).join('');
+
+                card.innerHTML = `
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h2 class="text-4xl font-black text-gray-900">${order.tableNo}번</h2>
+                            <span class="text-gray-400 text-sm">${order.orderTime}</span>
+                        </div>
+                        <div class="space-y-1 mb-6">${itemsHtml}</div>
+                        <div class="text-right text-gray-400 font-bold mb-4">합계: ${order.totalPrice.toLocaleString()}원</div>
+                        <button onclick="window.completeOrder('${id}')" class="w-full bg-gray-900 text-white py-5 rounded-2xl text-2xl font-black hover:bg-orange-600 transition-colors">조리 완료</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } else {
+            container.innerHTML = `<div class="col-span-full text-center py-20 text-gray-500 text-2xl">대기 중인 주문이 없습니다.</div>`;
+        }
+    });
+
+    window.completeOrder = function(id) {
+        if(confirm("서빙을 완료하셨나요?")) {
+            remove(ref(db, 'orders/' + id));
+        }
+    }
+
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }, 1000);
+</script>
+</body>
+</html>

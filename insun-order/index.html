@@ -1,0 +1,262 @@
+HTML
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인선식당 스마트 오더</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #F8F9FA; -webkit-tap-highlight-color: transparent; }
+        .menu-card { transition: all 0.2s ease; cursor: pointer; }
+        .menu-card:active { transform: scale(0.96); opacity: 0.8; }
+        .modal-overlay { transition: opacity 0.3s ease; }
+        .modal-content { transform: translateY(100%); transition: transform 0.3s ease-out; }
+        .active .modal-content { transform: translateY(0); }
+        .active.modal-overlay { opacity: 1; pointer-events: auto; }
+        .special-modal { transform: scale(0.8); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .active .special-modal { transform: scale(1); }
+    </style>
+</head>
+<body class="max-w-md mx-auto shadow-2xl min-h-screen pb-32 bg-white relative overflow-x-hidden">
+
+    <header class="p-6 flex justify-between items-end bg-white sticky top-0 z-10 border-b border-gray-50">
+        <h1 class="text-2xl font-bold text-gray-800">인선식당</h1>
+        <span id="table-display" class="text-sm text-gray-400 font-medium">연결 중...</span>
+    </header>
+    
+    <div id="category-container" class="flex gap-2 px-5 py-4 overflow-x-auto bg-white sticky top-[73px] z-10"></div>
+    <div class="grid grid-cols-2 gap-4 px-5 pt-2" id="menu-container"></div>
+
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-sm z-20">
+        <button onclick="window.openCartModal()" id="cart-bar" class="w-full h-16 bg-[#D35400] text-white rounded-2xl shadow-2xl flex justify-center items-center active:bg-orange-800 transition-all hidden">
+            <span id="cart-info" class="text-lg font-bold">장바구니 보기</span>
+        </button>
+    </div>
+
+    <div id="special-modal" class="modal-overlay fixed inset-0 bg-black/70 z-[60] flex items-center justify-center opacity-0 pointer-events-none p-6">
+        <div class="special-modal bg-white w-full rounded-[32px] overflow-hidden shadow-2xl relative border-4 border-yellow-400">
+            <div class="absolute top-0 left-0 bg-yellow-400 text-white px-4 py-2 font-black rounded-br-2xl z-10">TODAY'S SPECIAL</div>
+            <img id="special-img" src="" class="w-full h-64 object-cover">
+            <div class="p-6 text-center">
+                <h2 id="special-name" class="text-3xl font-black text-gray-800 mb-2"></h2>
+                <p class="text-gray-500 mb-6 font-medium">인선식당이 오늘만 특별히 추천하는 메뉴!</p>
+                <div class="flex gap-3">
+                    <button onclick="window.closeSpecialModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl">오늘은 괜찮아요</button>
+                    <button id="special-interest-btn" class="flex-[1.5] py-4 bg-yellow-400 text-gray-900 font-black rounded-2xl shadow-lg active:scale-95 transition-transform">자세히 보기 👀</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="modal-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center opacity-0 pointer-events-none p-6">
+        <div onclick="window.closeDetailModal()" class="absolute inset-0"></div>
+        <div class="modal-content bg-white w-full rounded-[32px] overflow-hidden shadow-2xl relative z-10">
+            <img id="detail-img" src="" class="w-full h-56 object-cover bg-gray-100">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-2">
+                    <h2 id="detail-name" class="text-2xl font-bold text-gray-800"></h2>
+                    <span id="detail-price" class="text-xl font-bold text-orange-600"></span>
+                </div>
+                <p id="detail-desc" class="text-gray-500 text-sm mb-6 leading-relaxed"></p>
+                <div class="flex gap-3">
+                    <button onclick="window.closeDetailModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 font-bold rounded-xl">닫기</button>
+                    <button id="detail-add-btn" class="flex-[2] py-4 bg-[#D35400] text-white font-bold rounded-xl shadow-lg">장바구니 담기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="cart-modal" class="modal-overlay fixed inset-0 bg-black/60 z-40 flex items-end justify-center opacity-0 pointer-events-none">
+        <div onclick="window.closeCartModal()" class="absolute inset-0"></div>
+        <div class="modal-content bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 shadow-2xl h-[70vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h2 class="text-2xl font-bold text-gray-800">장바구니</h2>
+                <button onclick="window.closeCartModal()" class="text-gray-400 text-2xl">&times;</button>
+            </div>
+            <div id="cart-items-container" class="flex-1 overflow-y-auto space-y-4 mb-4"></div>
+            <div class="border-t pt-4">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-gray-600">총 결제 금액</span>
+                    <span id="cart-total-price" class="text-2xl font-bold text-orange-600">0원</span>
+                </div>
+                <button onclick="window.processOrder()" class="w-full py-4 bg-[#D35400] text-white font-bold rounded-xl shadow-lg">주문하기</button>
+            </div>
+        </div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAnE0SJFtaNJP5w113-H9hj4zDZ54tzfrw",
+        authDomain: "insun-order.firebaseapp.com",
+        databaseURL: "https://insun-order-default-rtdb.firebaseio.com",
+        projectId: "insun-order",
+        storageBucket: "insun-order.firebasestorage.app",
+        messagingSenderId: "296909734803",
+        appId: "1:296909734803:web:3d3316c7e4e6e4812d9e66"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableNo = urlParams.get('table') || "기본";
+    
+    let menuData = [];
+    let cart = [];
+    let currentCategory = '전체';
+    let isSpecialShown = false;
+
+    // 데이터 감시 시작
+    onValue(ref(db, 'menu'), (snapshot) => {
+        const data = snapshot.val();
+        menuData = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+        
+        renderMenus();
+        renderCategories();
+        
+        // 연결 문구 업데이트
+        document.getElementById('table-display').innerText = `Table No. ${tableNo}`;
+
+        // 특선 메뉴 팝업 로직
+        if (!isSpecialShown && menuData.length > 0) {
+            const specialItem = menuData.find(item => String(item.isSpecial) === "true");
+            if (specialItem) {
+                setTimeout(() => {
+                    showSpecialPopup(specialItem);
+                    isSpecialShown = true;
+                }, 500);
+            }
+        }
+    });
+
+    function showSpecialPopup(item) {
+        document.getElementById('special-img').src = item.img || 'https://via.placeholder.com/300';
+        document.getElementById('special-name').innerText = item.name;
+        document.getElementById('special-interest-btn').onclick = () => {
+            window.closeSpecialModal();
+            window.openDetailModal(item.id);
+        };
+        document.getElementById('special-modal').classList.add('active', 'opacity-100');
+        document.getElementById('special-modal').classList.remove('pointer-events-none');
+    }
+
+    window.closeSpecialModal = function() {
+        document.getElementById('special-modal').classList.remove('active', 'opacity-100');
+        document.getElementById('special-modal').classList.add('pointer-events-none');
+    }
+
+    function renderCategories() {
+        const categories = ['전체', ...new Set(menuData.map(item => item.category))];
+        const container = document.getElementById('category-container');
+        container.innerHTML = categories.map(cat => `
+            <button onclick="window.filterMenu('${cat}')" 
+                class="px-6 py-2 rounded-full whitespace-nowrap font-medium transition-all
+                ${cat === currentCategory ? 'bg-orange-600 text-white font-bold shadow-md' : 'bg-gray-100 text-gray-500'}">
+                ${cat}
+            </button>
+        `).join('');
+    }
+
+    window.filterMenu = function(category) {
+        currentCategory = category;
+        renderMenus();
+        renderCategories();
+    }
+
+    function renderMenus() {
+        const container = document.getElementById('menu-container');
+        const filtered = currentCategory === '전체' ? menuData : menuData.filter(m => m.category === currentCategory);
+        container.innerHTML = filtered.map(item => `
+            <div onclick="window.openDetailModal('${item.id}')" class="menu-card bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 p-3 flex flex-col">
+                <img src="${item.img || 'https://via.placeholder.com/150'}" class="w-full h-32 object-cover rounded-xl mb-3 bg-gray-100">
+                <h3 class="font-bold text-gray-800 text-sm truncate">${item.name}</h3>
+                <p class="text-orange-600 font-bold text-sm mb-3">${Number(item.price).toLocaleString()}원</p>
+                <button onclick="event.stopPropagation(); window.addToCart('${item.id}')" class="mt-auto w-full py-2 bg-gray-50 text-gray-800 text-xs font-bold rounded-lg border border-gray-200">담기</button>
+            </div>
+        `).join('');
+    }
+
+    window.openDetailModal = function(id) {
+        const item = menuData.find(m => m.id === id);
+        if(!item) return;
+        document.getElementById('detail-img').src = item.img || 'https://via.placeholder.com/150';
+        document.getElementById('detail-name').innerText = item.name;
+        document.getElementById('detail-price').innerText = Number(item.price).toLocaleString() + '원';
+        document.getElementById('detail-desc').innerText = item.desc || "상세 설명이 등록되지 않은 메뉴입니다.";
+        document.getElementById('detail-add-btn').onclick = () => { window.addToCart(id); window.closeDetailModal(); };
+        document.getElementById('detail-modal').classList.add('active', 'opacity-100');
+        document.getElementById('detail-modal').classList.remove('pointer-events-none');
+    }
+
+    window.closeDetailModal = function() {
+        document.getElementById('detail-modal').classList.remove('active', 'opacity-100');
+        document.getElementById('detail-modal').classList.add('pointer-events-none');
+    }
+
+    window.addToCart = function(id) {
+        const item = menuData.find(m => m.id === id);
+        const exist = cart.find(c => c.id === id);
+        if (exist) exist.quantity++;
+        else cart.push({ ...item, quantity: 1 });
+        updateCartBar();
+    }
+
+    function updateCartBar() {
+        const bar = document.getElementById('cart-bar');
+        const count = cart.reduce((sum, i) => sum + i.quantity, 0);
+        if (count > 0) bar.classList.remove('hidden');
+        else bar.classList.add('hidden');
+    }
+
+    window.openCartModal = function() {
+        const container = document.getElementById('cart-items-container');
+        container.innerHTML = cart.map(item => `
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div><h4 class="font-bold text-sm">${item.name}</h4><p class="text-xs text-gray-500">${item.price.toLocaleString()}원</p></div>
+                <div class="flex items-center gap-3">
+                    <button onclick="window.updateQty('${item.id}', -1)" class="w-8 h-8 bg-white border rounded-full">-</button>
+                    <span class="font-bold">${item.quantity}</span>
+                    <button onclick="window.updateQty('${item.id}', 1)" class="w-8 h-8 bg-white border rounded-full">+</button>
+                </div>
+            </div>
+        `).join('');
+        const total = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        document.getElementById('cart-total-price').innerText = total.toLocaleString() + '원';
+        document.getElementById('cart-modal').classList.add('active', 'opacity-100');
+        document.getElementById('cart-modal').classList.remove('pointer-events-none');
+    }
+
+    window.updateQty = function(id, change) {
+        const item = cart.find(c => c.id === id);
+        if(!item) return;
+        item.quantity += change;
+        if (item.quantity <= 0) cart = cart.filter(c => c.id !== id);
+        cart.length === 0 ? window.closeCartModal() : window.openCartModal();
+        updateCartBar();
+    }
+
+    window.closeCartModal = function() {
+        document.getElementById('cart-modal').classList.remove('active', 'opacity-100');
+        document.getElementById('cart-modal').classList.add('pointer-events-none');
+    }
+
+    window.processOrder = function() {
+        if (cart.length === 0) return;
+        push(ref(db, 'orders'), {
+            tableNo: tableNo,
+            items: cart,
+            totalPrice: cart.reduce((sum, i) => sum + (i.price * i.quantity), 0),
+            orderTime: new Date().toLocaleTimeString(),
+            timestamp: Date.now()
+        }).then(() => {
+            alert("주문이 주방으로 전송되었습니다! 🚀");
+            cart = []; updateCartBar(); window.closeCartModal();
+        });
+    }
+</script>
+</body>
+</html>
