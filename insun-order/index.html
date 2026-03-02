@@ -86,8 +86,9 @@ HTML
     </div>
 
 <script type="module">
+    // Firebase 라이브러리 로드
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, onValue, push, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAnE0SJFtaNJP5w113-H9hj4zDZ54tzfrw",
@@ -110,6 +111,21 @@ HTML
     let currentCategory = '전체';
     let isSpecialShown = false;
 
+    // [중요] 메뉴 업데이트 함수 (구 메뉴/신 메뉴 통합 수정용)
+    window.updateMenuItem = function(itemId, category, name, price, note, image) {
+        const updatedData = {
+            category: category,
+            name: name,
+            price: Number(price),
+            desc: note,   // note를 desc로 매칭
+            img: image    // image를 img로 매칭
+        };
+        
+        update(ref(db, `menu/${itemId}`), updatedData)
+            .then(() => alert("성공적으로 수정되었습니다! ✨"))
+            .catch((err) => alert("수정 오류: " + err.message));
+    };
+
     // 데이터 감시 시작
     onValue(ref(db, 'menu'), (snapshot) => {
         const data = snapshot.val();
@@ -118,10 +134,8 @@ HTML
         renderMenus();
         renderCategories();
         
-        // 연결 문구 업데이트
         document.getElementById('table-display').innerText = `Table No. ${tableNo}`;
 
-        // 특선 메뉴 팝업 로직
         if (!isSpecialShown && menuData.length > 0) {
             const specialItem = menuData.find(item => String(item.isSpecial) === "true");
             if (specialItem) {
@@ -183,10 +197,11 @@ HTML
     window.openDetailModal = function(id) {
         const item = menuData.find(m => m.id === id);
         if(!item) return;
-        document.getElementById('detail-img').src = item.img || 'https://via.placeholder.com/150';
+        // [수정] 구 버전 필드(note)와 신 버전 필드(desc) 모두 대응 가능하도록 처리
+        document.getElementById('detail-img').src = item.img || item.image || 'https://via.placeholder.com/150';
         document.getElementById('detail-name').innerText = item.name;
         document.getElementById('detail-price').innerText = Number(item.price).toLocaleString() + '원';
-        document.getElementById('detail-desc').innerText = item.desc || "상세 설명이 등록되지 않은 메뉴입니다.";
+        document.getElementById('detail-desc').innerText = item.desc || item.note || "상세 설명이 등록되지 않은 메뉴입니다.";
         document.getElementById('detail-add-btn').onclick = () => { window.addToCart(id); window.closeDetailModal(); };
         document.getElementById('detail-modal').classList.add('active', 'opacity-100');
         document.getElementById('detail-modal').classList.remove('pointer-events-none');
@@ -216,7 +231,7 @@ HTML
         const container = document.getElementById('cart-items-container');
         container.innerHTML = cart.map(item => `
             <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div><h4 class="font-bold text-sm">${item.name}</h4><p class="text-xs text-gray-500">${item.price.toLocaleString()}원</p></div>
+                <div><h4 class="font-bold text-sm">${item.name}</h4><p class="text-xs text-gray-500">${Number(item.price).toLocaleString()}원</p></div>
                 <div class="flex items-center gap-3">
                     <button onclick="window.updateQty('${item.id}', -1)" class="w-8 h-8 bg-white border rounded-full">-</button>
                     <span class="font-bold">${item.quantity}</span>
